@@ -96,6 +96,29 @@ class GcsService:
             logger.error(f"Failed to download bytes from '{gcs_uri}': {e}")
             return None
 
+    def download_stream_from_gcs(self, gcs_uri: str):
+        """
+        Yields chunks of bytes from a GCS blob.
+
+        Args:
+            gcs_uri: The full GCS URI (e.g., "gs://bucket-name/path/to/blob").
+        """
+        if not gcs_uri.startswith("gs://"):
+            logger.error(f"Invalid GCS URI provided: {gcs_uri}")
+            return
+
+        try:
+            bucket_name, blob_name = gcs_uri.replace("gs://", "").split("/", 1)
+            bucket = self.client.bucket(bucket_name)
+            blob = bucket.blob(blob_name)
+            
+            with blob.open("rb") as f:
+                while chunk := f.read(8192):
+                    yield chunk
+        except Exception as e:
+            logger.error(f"Failed to stream from '{gcs_uri}': {e}")
+            raise e
+
     def upload_file_to_gcs(
         self, local_path: str, destination_blob_name: str, mime_type: str
     ):

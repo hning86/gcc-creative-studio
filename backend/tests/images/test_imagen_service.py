@@ -432,10 +432,15 @@ def test_process_image_in_background_sync_gemini_model(mock_genai_init, mock_wor
         mock_gemini_gen.return_value = (mock_result, None)
 
         with patch("src.images.imagen_service.MediaRepository") as mock_media_repo_class, \
+             patch("src.images.imagen_service.GeminiService") as mock_gemini_service_class, \
              patch("src.images.imagen_service.GcsService") as mock_gcs_class:
             
             mock_media_repo = AsyncMock()
             mock_media_repo_class.return_value = mock_media_repo
+            
+            mock_gemini_service = AsyncMock()
+            mock_gemini_service.enhance_prompt_from_dto.return_value = "Enhanced Prompt"
+            mock_gemini_service_class.return_value = mock_gemini_service
             
             mock_gcs = AsyncMock()
             mock_gcs.bucket_name = "test-bucket"
@@ -471,10 +476,20 @@ def test_process_image_in_background_sync_with_upscale(mock_genai_init, mock_wor
     mock_client.models.generate_images.return_value = mock_response
 
     with patch("src.images.imagen_service.MediaRepository") as mock_media_repo_class, \
+         patch("src.images.imagen_service.GeminiService") as mock_gemini_service_class, \
+         patch("src.images.imagen_service.GcsService") as mock_gcs_class, \
          patch("src.images.imagen_service.ImagenService.upscale_image") as mock_upscale_method:
         
         mock_media_repo = AsyncMock()
         mock_media_repo_class.return_value = mock_media_repo
+        
+        mock_gemini_service = AsyncMock()
+        mock_gemini_service.enhance_prompt_from_dto.return_value = "Enhanced Prompt"
+        mock_gemini_service_class.return_value = mock_gemini_service
+        
+        mock_gcs = AsyncMock()
+        mock_gcs.bucket_name = "test-bucket"
+        mock_gcs_class.return_value = mock_gcs
         
         # Mock upscale result
         mock_upscale_result = MagicMock()
@@ -860,11 +875,16 @@ def test_process_image_in_background_sync_edit_image(mock_genai_init, mock_worke
 
     with patch("src.images.imagen_service.MediaRepository") as mock_media_repo_class, \
          patch("src.images.imagen_service.SourceAssetRepository") as mock_source_asset_repo_class, \
-         patch("src.common.storage_service.GcsService") as mock_gcs_class:
+         patch("src.images.imagen_service.GeminiService") as mock_gemini_service_class, \
+         patch("src.images.imagen_service.GcsService") as mock_gcs_class:
 
          
         mock_media_repo = AsyncMock()
         mock_media_repo_class.return_value = mock_media_repo
+        
+        mock_gemini_service = AsyncMock()
+        mock_gemini_service.enhance_prompt_from_dto.return_value = "Enhanced Prompt"
+        mock_gemini_service_class.return_value = mock_gemini_service
         
         mock_sa_repo = AsyncMock()
         mock_source_asset_repo_class.return_value = mock_sa_repo
@@ -891,6 +911,108 @@ def test_process_image_in_background_sync_edit_image(mock_genai_init, mock_worke
         args, kwargs = mock_media_repo.update.call_args
         assert args[0] == 777
         assert args[1]["status"] == JobStatusEnum.COMPLETED
+
+
+def test_create_imagen_dto_validation_failures():
+    from src.images.dto.create_imagen_dto import CreateImagenDto
+    from src.common.base_dto import GenerationModelEnum
+    import pytest
+    from pydantic import ValidationError
+
+    # 1. Empty prompt
+    with pytest.raises(ValidationError) as exc_info:
+        CreateImagenDto(
+            prompt="   ",
+            workspace_id=1,
+            generation_model=GenerationModelEnum.IMAGEN_4_ULTRA
+        )
+    assert "Prompt cannot be empty" in str(exc_info.value)
+
+    # 2. Too many inputs
+    with pytest.raises(ValidationError) as exc_info:
+        CreateImagenDto(
+            prompt="Generate image",
+            workspace_id=1,
+            generation_model=GenerationModelEnum.IMAGEN_3_FAST,
+            source_asset_ids=[1, 2]
+        )
+    assert "maximum" in str(exc_info.value)
+
+    # 3. Invalid aspect ratio for model
+    from src.common.base_dto import AspectRatioEnum
+    with pytest.raises(ValidationError) as exc_info:
+        CreateImagenDto(
+            prompt="Generate image",
+            workspace_id=1,
+            generation_model=GenerationModelEnum.IMAGEN_4_ULTRA,
+            aspect_ratio=AspectRatioEnum.RATIO_1_4
+        )
+    assert "not supported" in str(exc_info.value)
+
+    # 4. Invalid generation model for imagen
+    with pytest.raises(ValidationError) as exc_info:
+        CreateImagenDto(
+            prompt="Generate image",
+            workspace_id=1,
+            generation_model=GenerationModelEnum.VEO_3_FAST
+        )
+    assert "Invalid generation model" in str(exc_info.value)
+
+    # 5. Unsupported editing model
+    with pytest.raises(ValidationError) as exc_info:
+        CreateImagenDto(
+            prompt="Edit image",
+            workspace_id=1,
+            generation_model=GenerationModelEnum.IMAGEN_4_ULTRA,
+            source_asset_ids=[1]
+        )
+    assert "does not support image editing" in str(exc_info.value)
+
+
+def test_upscale_imagen_dto_validation_failures():
+    from src.images.dto.upscale_imagen_dto import UpscaleImagenDto
+    from src.common.base_dto import GenerationModelEnum, MimeTypeEnum
+    import pytest
+    from pydantic import ValidationError
+
+    # 1. Invalid model for upscale
+    with pytest.raises(ValidationError) as exc_info:
+        UpscaleImagenDto(
+            generation_model=GenerationModelEnum.VEO_3_FAST,
+            user_image="base64str"
+        )
+    assert "Invalid generation model" in str(exc_info.value)
+
+    # 2. Invalid mime type
+    with pytest.raises(ValidationError) as exc_info:
+        UpscaleImagenDto(
+            user_image="base64str",
+            mime_type=MimeTypeEnum.AUDIO_WAV
+        )
+    assert "Invalid mime type" in str(exc_info.value)
+
+
+def test_vto_dto_validation_failures():
+    from src.images.dto.vto_dto import VtoDto, VtoInputLink
+    import pytest
+    from pydantic import ValidationError
+
+    # 1. Invalid VtoInputLink (Both provided)
+    with pytest.raises(ValidationError) as exc_info:
+        VtoInputLink(
+            source_asset_id=1,
+            source_media_item={"media_item_id": 1, "media_index": 0}
+        )
+    assert "Exactly one" in str(exc_info.value)
+
+    # 2. VtoDto with no garment
+    valid_input = VtoInputLink(source_asset_id=1)
+    with pytest.raises(ValidationError) as exc_info:
+        VtoDto(
+            workspace_id=1,
+            person_image=valid_input
+        )
+    assert "At least one garment" in str(exc_info.value)
 
 
 

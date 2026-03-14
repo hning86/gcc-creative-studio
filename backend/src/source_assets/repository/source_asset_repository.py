@@ -59,7 +59,7 @@ class SourceAssetRepository(BaseRepository[SourceAsset, SourceAssetModel]):
         """
         Performs a paginated query for assets.
         """
-        query = select(self.model).where(self.model.deleted_at.is_(None))
+        query = select(self.model)
 
         # Apply filters
         if search_dto.mime_type:

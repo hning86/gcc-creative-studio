@@ -15,6 +15,7 @@
 import asyncio
 import io
 import logging
+import mimetypes
 import tempfile
 import zipfile
 from typing import Optional
@@ -471,9 +472,10 @@ class GalleryService:
 
         # Create a temporary file to hold the ZIP archive to avoid OOM
         temp_file = tempfile.TemporaryFile()
+        downloads_log = []
         
         try:
-            with zipfile.ZipFile(temp_file, "w", zipfile.ZIP_DEFLATED, False) as zip_file:
+            with zipfile.ZipFile(temp_file, "w", zipfile.ZIP_DEFLATED, True) as zip_file:
                 for item in bulk_download_dto.items:
                     try:
                         gcs_uri = None
@@ -491,20 +493,14 @@ class GalleryService:
                             )
                             if media_item.gcs_uris:
                                 gcs_uri = media_item.gcs_uris[0]
-                                # Use mime_type to determine extension
-                                ext = "bin"
                                 mime_type = getattr(media_item, "mime_type", None)
-                                if mime_type:
-                                    mime_str = str(mime_type)
-                                    if "image/png" in mime_str: ext = "png"
-                                    elif "image/jpeg" in mime_str: ext = "jpg"
-                                    elif "video/mp4" in mime_str: ext = "mp4"
-                                    elif "audio/mpeg" in mime_str: ext = "mp3"
-                                    elif "audio/wav" in mime_str: ext = "wav"
-                                    elif "/" in mime_str:
-                                        ext = mime_str.split("/")[-1]
                                 
-                                if ext == "bin" and "." in gcs_uri:
+                                # Use mimetypes library for guessing extension
+                                ext = "bin"
+                                if mime_type:
+                                    ext = mimetypes.guess_extension(str(mime_type)) or "bin"
+                                    if ext.startswith("."): ext = ext[1:]
+                                elif "." in gcs_uri:
                                     ext = gcs_uri.split(".")[-1]
                                     
                                 filename = f"media_{item.id}.{ext}"
@@ -524,13 +520,26 @@ class GalleryService:
                                 filename = f"asset_{item.id}.{ext}"
     
                         if gcs_uri and filename:
-                            # Use asyncio.to_thread for blocking GCS downloads
-                            content = await asyncio.to_thread(self.gcs_service.download_bytes_from_gcs, gcs_uri)
-                            if content:
-                                zip_file.writestr(filename, content)
+                            try:
+                                # Stream from GCS directly into ZipFile.open() to avoid OOM
+                                def stream_to_zip():
+                                    with zip_file.open(filename, "w") as zf:
+                                        for chunk in self.gcs_service.download_stream_from_gcs(gcs_uri):
+                                            zf.write(chunk)
+                                
+                                await asyncio.to_thread(stream_to_zip)
+                                downloads_log.append(f"- Success: {filename}")
+                            except Exception as e:
+                                downloads_log.append(f"- Failed: {filename} ({e})")
+                                logger.error(f"Error streaming {item.type} {item.id} to ZIP: {e}")
                     except Exception as e:
-                        logger.error(f"Error adding {item.type} {item.id} to ZIP: {e}")
+                        logger.error(f"Error processing {item.type} {item.id}: {e}")
     
+                # Add failure / success manifest README
+                if downloads_log:
+                    manifest_content = "Bulk Download Manifest\n======================\n\n" + "\n".join(downloads_log)
+                    zip_file.writestr("manifest.txt", manifest_content)
+                    
             # Seek to beginning for streaming
             temp_file.seek(0)
             
