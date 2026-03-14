@@ -104,7 +104,7 @@ class UnifiedGalleryRepository(BaseRepository[UnifiedGalleryView, UnifiedGallery
 
         # 3. Add ordering and pagination
         # Default ordering by created_at DESC
-        query = query.order_by(self.model.created_at.desc())
+        query = query.order_by(self.model.created_at.desc(), self.model.id.desc())
 
         # Offset-based pagination
         query = query.offset(search_dto.offset).limit(search_dto.limit)

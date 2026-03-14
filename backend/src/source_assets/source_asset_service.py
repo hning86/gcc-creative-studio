@@ -459,7 +459,7 @@ class SourceAssetService:
             scope=final_scope,
             asset_type=final_asset_type,
         )
-        created_asset = await self.repo.create(original_asset)
+        created_asset = await self.repo.create(new_asset)
         new_asset.id = created_asset.id
 
         return await self._create_asset_response(new_asset)
