@@ -121,9 +121,10 @@ class TagsService:
         updated = await self.repo.update_tag(id, dto.name, dto.color)
         return updated
 
-    async def delete_tag(self, id: int, user_id: int, is_admin: bool) -> bool:
+    async def delete_tag(self, id: int, user_id: int, is_admin: bool, tag: TagModel | None = None) -> bool:
         """Deletes a tag by its ID."""
-        tag = await self.repo.get_by_id(id)
+        if not tag:
+            tag = await self.repo.get_by_id(id)
         if not tag:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail="Tag not found"

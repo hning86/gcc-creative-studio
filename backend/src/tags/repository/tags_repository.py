@@ -171,7 +171,7 @@ class TagsRepository(BaseRepository[Tag, TagModel]):
         )
         await self.db.commit()
 
-    async def clear_tags_for_items(self, item_ids: list[int], item_type: str):
+    async def clear_tags_for_items(self, item_ids: list[int], item_type: str, commit: bool = True):
         """Removes all tags from multiple items."""
         table = (
             media_item_tags if item_type == "media_item" else source_asset_tags
@@ -182,9 +182,11 @@ class TagsRepository(BaseRepository[Tag, TagModel]):
             else table.c.source_asset_id
         )
         await self.db.execute(delete(table).where(id_col.in_(item_ids)))
+        if commit:
+            await self.db.commit()
 
     async def assign_tags_to_items(
-        self, item_ids: list[int], tag_ids: list[int], item_type: str
+        self, item_ids: list[int], tag_ids: list[int], item_type: str, commit: bool = True
     ):
         """Links multiple tags to multiple items."""
         table = (
@@ -209,6 +211,9 @@ class TagsRepository(BaseRepository[Tag, TagModel]):
                 .where(self.model.id.in_(tag_ids))
                 .values(updated_at=func.now())
             )
+            
+            if commit:
+                await self.db.commit()
 
     async def update_tag(
         self, id: int, name: str | None = None, color: str | None = None

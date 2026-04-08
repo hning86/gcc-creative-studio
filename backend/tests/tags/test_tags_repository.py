@@ -103,3 +103,52 @@ async def test_get_tags_for_media_item():
 
     assert len(result) == 1
     assert result[0].name == "tag1"
+
+
+@pytest.mark.anyio
+async def test_clear_tags_for_items():
+    """Tests clear_tags_for_items."""
+    mock_db = AsyncMock()
+    repo = TagsRepository(db=mock_db)
+
+    await repo.clear_tags_for_items([1, 2], "media_item")
+
+    assert mock_db.execute.call_count == 1
+    mock_db.commit.assert_called_once()
+
+
+@pytest.mark.anyio
+async def test_clear_tags_for_items_no_commit():
+    """Tests clear_tags_for_items with commit=False."""
+    mock_db = AsyncMock()
+    repo = TagsRepository(db=mock_db)
+
+    await repo.clear_tags_for_items([1, 2], "media_item", commit=False)
+
+    assert mock_db.execute.call_count == 1
+    mock_db.commit.assert_not_called()
+
+
+@pytest.mark.anyio
+async def test_assign_tags_to_items():
+    """Tests assign_tags_to_items."""
+    mock_db = AsyncMock()
+    repo = TagsRepository(db=mock_db)
+
+    await repo.assign_tags_to_items([1, 2], [10, 20], "media_item")
+
+    # 1 for insert, 1 for update tags
+    assert mock_db.execute.call_count == 2
+    mock_db.commit.assert_called_once()
+
+
+@pytest.mark.anyio
+async def test_assign_tags_to_items_no_commit():
+    """Tests assign_tags_to_items with commit=False."""
+    mock_db = AsyncMock()
+    repo = TagsRepository(db=mock_db)
+
+    await repo.assign_tags_to_items([1, 2], [10, 20], "media_item", commit=False)
+
+    assert mock_db.execute.call_count == 2
+    mock_db.commit.assert_not_called()

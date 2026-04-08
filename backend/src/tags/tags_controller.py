@@ -142,7 +142,7 @@ async def delete_tag(
             user=current_user,
         )
 
-    return await service.delete_tag(tag_id, current_user.id, is_admin)
+    return await service.delete_tag(tag_id, current_user.id, is_admin, tag=tag)
 
 
 @router.post("/bulk-assign")
