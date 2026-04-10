@@ -256,6 +256,7 @@ class GalleryService:
             presigned_urls=presigned_urls,
             original_presigned_urls=original_presigned_urls,
             presigned_thumbnail_urls=presigned_thumbnail_urls,
+            enriched_source_assets=enriched_source_assets or None,
             enriched_source_media_items=enriched_source_media_items or None,
         )
 
