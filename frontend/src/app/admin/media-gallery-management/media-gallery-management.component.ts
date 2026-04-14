@@ -24,6 +24,7 @@ import {MatSnackBar} from '@angular/material/snack-bar';
 import {firstValueFrom} from 'rxjs';
 import {GalleryService} from '../../gallery/gallery.service';
 import {GalleryItem} from '../../common/models/gallery-item.model';
+import {JobStatus} from '../../common/models/media-item.model';
 import {
   TagsService,
   TagModel,
@@ -79,6 +80,7 @@ export class MediaGalleryManagementComponent implements OnInit {
   }));
 
   modelOptions: {value: string; label: string}[] = [];
+  statusOptions: {value: string; label: string}[] = [];
 
   // Pagination
   totalItems = 0;
@@ -102,6 +104,14 @@ export class MediaGalleryManagementComponent implements OnInit {
     this.modelOptions = [
       {value: '', label: 'All Models'},
       ...this.generationModels.map(m => ({value: m.value, label: m.viewValue})),
+    ];
+
+    this.statusOptions = [
+      {value: '', label: 'All Statuses'},
+      {value: JobStatus.COMPLETED, label: 'Completed'},
+      {value: JobStatus.PROCESSING, label: 'Processing'},
+      {value: JobStatus.FAILED, label: 'Failed'},
+      {value: JobStatus.STOPPED, label: 'Stopped'},
     ];
 
     const workspaceId = this.workspaceStateService.getActiveWorkspaceId();
