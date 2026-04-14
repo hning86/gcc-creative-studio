@@ -41,10 +41,9 @@
     <mat-form-field appearance="outline" class="!mb-0">
       <mat-label>Status</mat-label>
       <mat-select [(ngModel)]="filterStatus" (selectionChange)="applyFilters()">
-        <mat-option value="">All Statuses</mat-option>
-        <mat-option value="completed">Completed</mat-option>
-        <mat-option value="processing">Processing</mat-option>
-        <mat-option value="failed">Failed</mat-option>
+        <mat-option *ngFor="let opt of statusOptions" [value]="opt.value">
+          {{ opt.label }}
+        </mat-option>
       </mat-select>
     </mat-form-field>
 
