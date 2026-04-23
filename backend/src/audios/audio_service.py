@@ -296,8 +296,7 @@ def _process_audio_in_background(
                                     if not audio_b64:
                                         return None
 
-                                    timestamp = int(time.time())
-                                    file_name = f"lyria_music_{timestamp}_{uid_short}_{index}.wav"
+                                    file_name = f"lyria_music_{media_item_id}_{uid_short}_{index}.wav"
                                     return gcs_service.store_to_gcs(
                                         folder="lyria_audio",
                                         file_name=file_name,
